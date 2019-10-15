@@ -253,13 +253,11 @@ public class Program {
 						int retOffset = Program.get_ret_offset(strArray13[strArray13.length - 1]);
 						if (retOffset % 4 == 0 && retOffset <= 16){
 							Program.found_gadget(str3);
-							System.out.println("Keeping gadget: " + str3);
 						}
 
 					}
 					else{
 						Program.found_gadget(str3);
-						System.out.println("Keeping gadget: " + str3);
 					}
 				}
 				// TODO: Here is where we can add JOP/COP scoring, an else if that grabs JOP/COP gadgets we consider useful.
@@ -481,6 +479,9 @@ public class Program {
 		String[] strArray26 = new String[]{ "r13", "r13d", "r13w", "r13b" };
 		String[] strArray27 = new String[]{ "r14", "r14d", "r14w", "r14b" };
 		String[] strArray28 = new String[]{ "r15", "r15d", "r15w", "r15b" };
+
+		String[] condBranchInstrs = new String[]{ "jo", "jno", "js", "jns", "je,", "jz", "jne", "jnz", "jb", "jnae", "jc", "jnb", "jae", "jnc", "jbe", "jna", "ja", "jnbe", "jl", "jnge", "jnl", "jge", "jle", "jng", "jg", "jnle", "jp", "jpe", "jnp", "jpo", "jcxz", "jecxz" };
+
 		String[] strArray29 = gadget.split(";");
 		double num = 0.0;
 		String[] strArray30 = new String[4];
@@ -598,9 +599,13 @@ public class Program {
 							&& !(Arrays.stream(strArray9).filter(instr -> ins.contains(instr)).count() > 0) 
 							&& (!(Arrays.stream(strArray10).filter(instr -> ins.contains(instr)).count() > 0) 
 									&& !(Arrays.stream(strArray11).filter(instr -> ins.contains(instr)).count() > 0))) 
-					&& !(Arrays.stream(strArray12).filter(instr -> ins.contains(instr)).count() > 0))
+					&& !(Arrays.stream(strArray12).filter(instr -> ins.contains(instr)).count() > 0)){
 				++Program.tmp_unmapped;
-
+			}
+			// MDB - Check to see if the gadget contains an unconditional branch.  If it occurs, increase score by 2.0.			
+			else if (Arrays.stream(condBranchInstrs).filter(instr -> ins.contains(instr)).count() > 0){
+				num += 2.0;
+			}
 		}
 		return num;
 	}
