@@ -99,13 +99,18 @@ public class Program {
 		System.out.println("Sit back, we're finding your gadgets... (this can take a few seconds)");
 		
 		String str1 = new String();
+
+		// While there lines in the ROPgadget output file
 		while ((str1 = streamReader1.readLine()) != null) {
-			
+			// Check to see if the line has a colom, which indicates a gadget (rather than header or footer)
 			if (str1.contains(" : ")) {
-				String[] strArray13 = str1.substring(str1.indexOf(" : ") + 3, str1.length()/* - str1.indexOf(" : ") - 3*/).split(";");
+				// Split the gadget portion up into individual instructions
+				String[] strArray13 = str1.substring(str1.indexOf(" : ") + 3, str1.length()).split(";");			
+				// Consider the gadget useful if it starts with an instruction in strArr1
 				if (Arrays.stream(strArray1).filter(instr -> strArray13[0].startsWith(instr)).count() > 0)
 					++Program.cnt_useful;
-
+				
+				// Count up the number of each category of gadget
 				if (Arrays.stream(strArray3).filter(instr -> strArray13[0].startsWith(instr)).count() > 0)
 					++Program.cnt_gd_ar;
 				else if (Arrays.stream(strArray2).filter(instr -> strArray13[0].startsWith(instr)).count() > 0)
@@ -133,6 +138,7 @@ public class Program {
 
 		}
 		streamReader1.close();
+		// Output the cagtegory numbers.
 		Program.output.write("Arithmetic Gadgets: " + (Object)Program.cnt_gd_ar+ "\n");
 		Program.output.write("Data-Move Gadgets: " + (Object)Program.cnt_gd_mov_data+ "\n");
 		Program.output.write("Control-Flow Gadgets: " + (Object)Program.cnt_cf+ "\n");
@@ -158,21 +164,25 @@ public class Program {
 		List<String> stringList10 = new ArrayList<String>();
 		List<String> stringList11 = new ArrayList<String>();
 		String str2 = new String();
+		// Iterate through the file again
 		while ((str2 = streamReader2.readLine()) != null)
-		{
+		{ // Check if its a gadget
 			if (str2.contains(" : "))
-			{
+			{	// Get just the gadget part and split it up (again)
 				String gadget = str2.substring(str2.indexOf(" : ") + 3, str2.length());
 				String[] strArray13 = gadget.split(";");
+				
+				// Check for parameter loading gadgets (rcx, rdx, r8, r9)
 				if (strArray13[0].contains("pop rcx") || strArray13[0].contains("mov rcx"))
-				{
+				{	//  If the instruction pops to the register, is immediately followed by the ret, doesn't have an offensive return adjustment (i.e. is byte aligned and less than 16 bytes) and the only instructions are the pop and the ret, add this gadget to stringlist1 (good rcx gadgets)
 					if (strArray13[0].contains("pop rcx") && strArray13[1].contains("ret") && (Program.get_ret_offset(strArray13[1]) % 4 == 0 && Program.get_ret_offset(strArray13[1]) <= 16) && strArray13.length == 2)
 						stringList1.add(gadget);
+					// Otherwise, as long as the gadget preserves the register add it to string list 2 (bad rcx gadgets)					
 					else if (Program.preserves_reg(gadget))
 						stringList2.add(gadget);
 
 				}
-
+				// Same as previous block, except for rdx
 				if (strArray13[0].contains("pop rdx") || strArray13[0].contains("mov rdx"))
 				{
 					if (strArray13[0].contains("pop rdx") && strArray13[1].contains("ret") && (Program.get_ret_offset(strArray13[1]) % 4 == 0 && Program.get_ret_offset(strArray13[1]) <= 16) && strArray13.length == 2)
@@ -181,7 +191,7 @@ public class Program {
 						stringList4.add(gadget);
 
 				}
-
+				// Same as previous block, except for r8
 				if (strArray13[0].contains("pop r8") || strArray13[0].contains("mov r8"))
 				{
 					if (strArray13[0].contains("pop r8") && strArray13[1].contains("ret") && (Program.get_ret_offset(strArray13[1]) % 4 == 0 && Program.get_ret_offset(strArray13[1]) <= 16) && strArray13.length == 2)
@@ -190,7 +200,7 @@ public class Program {
 						stringList6.add(gadget);
 
 				}
-
+				// Same as previous block, except for r9
 				if (strArray13[0].contains("pop r9") || strArray13[0].contains("mov r9"))
 				{
 					if (strArray13[0].contains("pop r9") && strArray13[1].contains("ret") && (Program.get_ret_offset(strArray13[1]) % 4 == 0 && Program.get_ret_offset(strArray13[1]) <= 16) && strArray13.length == 2)
@@ -199,9 +209,9 @@ public class Program {
 						stringList8.add(gadget);
 
 				}
-
+				// For each instruction in the gadget
 				for (String str3 : strArray13)
-				{
+				{	// Check to see if the gadget is a good or bad stack pivot gadget (strlist 9 or 10 respectively)
 					if (str3.contains("xchg") && str3.contains("rsp") && !str3.contains("["))
 						stringList9.add(gadget);
 
@@ -212,6 +222,7 @@ public class Program {
 						stringList10.add(gadget);
 
 				}
+				// Check if the gadget is a call reg gadget without memory accesses (e.g. call rax, call r8) (what was this used for in the paper?)
 				if (strArray13.length == 1 && (strArray13[0].contains("call") || strArray13[0].contains("jmp")) && (!strArray13[0].contains("0x") && !strArray13[0].contains("ptr")))
 					stringList11.add(gadget);
 
@@ -224,30 +235,39 @@ public class Program {
 		Program.output.write("Bad gadgets: rcx: " + (Object)stringList2.size() + "; rdx: " + (Object)stringList4.size() + "; r8: " + (Object)stringList6.size() + "; r9: " + (Object)stringList8.size() +"\n");
 		Program.output.write("Good / bad stack pivots: " + (Object)stringList9.size() + " / " + (Object)stringList10.size() +"\n");
 		Program.output.write("Call reg: " + (Object)stringList11.size() +"\n");
+		
+		// Make a third pass through the gadgets
 		BufferedReader streamReader3 = new BufferedReader(new FileReader(new File(ropgadget_output_file)));
 		String str4 = new String();
 		while ((str4 = streamReader3.readLine()) != null)
-		{
+		{	// Get just gadgets
 			if (str4.contains(" : "))
-			{
+			{	// Split into array of instructions
 				String str3 = str4.substring(str4.indexOf(" : ") + 3, str4.length());
 				String[] strArray13 = str3.split(";");
+				// Determine if we are going to score this gadget: It starts with a useful instruction, preserves the register of interest in the gadget, and ends in a ret (ROP only).
 				if (Arrays.stream(strArray1).filter(instr -> strArray13[0].startsWith(instr)).count() > 0 && Program.preserves_reg(str3) && strArray13[strArray13.length - 1].contains("ret"))
-				{
+				{	// If the gadget contains a return offset, check that it is byte aligned and less than 16 bytes. If so, or if no offset, score the gadget.
 					if (strArray13[strArray13.length - 1].contains("0x"))
 					{
 						int retOffset = Program.get_ret_offset(strArray13[strArray13.length - 1]);
-						if (retOffset % 4 == 0 && retOffset <= 16)
+						if (retOffset % 4 == 0 && retOffset <= 16){
 							Program.found_gadget(str3);
+							System.out.println("Keeping gadget: " + str3);
+						}
 
 					}
-					else
-						Program.found_gadget(str3); 
+					else{
+						Program.found_gadget(str3);
+						System.out.println("Keeping gadget: " + str3);
+					}
 				}
+				// TODO: Here is where we can add JOP/COP scoring, an else if that grabs JOP/COP gadgets we consider useful.
 
 			}
 
 		}
+		// Print put gadget quality metric data
 		streamReader3.close();
 		System.out.println("Done.");
 		Program.output.write("Kept " + (Object)Program.cnt_gadgets + " gadgets.\n");
@@ -256,8 +276,8 @@ public class Program {
 	}
 
 	private static void found_gadget(String line) throws Exception {
-		if (Program.preserves_reg(line))
-			++Program.cnt_gadgets;
+		// MDB Redundant check eliminated (preserves_reg())
+		++Program.cnt_gadgets;
 
 		int spOffset = Program.calculate_sp_offset(line);
 		double num = Program.calc_score(line) + (double)spOffset;
@@ -265,6 +285,7 @@ public class Program {
 		++Program.total_kept;
 	}
 
+	// TODO FIX BUG IN HERE THAT I'M GETTING WHEN RUNNING WITH 0x80
 	private static int get_ret_offset(String ins) throws Exception {
 		if (ins.trim().equals("ret") || ins.trim().equals("retf")) {
 			return 0;
@@ -288,12 +309,10 @@ public class Program {
 		return result;
 	}
 
-	private static boolean ends_with_ret(String gadget) throws Exception {
-		String[] strArray = gadget.split(";");
-		return strArray[strArray.length - 1].contains("ret");
-	}
+	// MDB - Unneeded function eliminated
 
 	private static boolean preserves_reg(String gadget) throws Exception {
+		// Determine the register to protect, its the destination of the first instruction (some exceptions)
 		String[] strArray1 = new String[]{ "rax", "eax", "ax", "al", "ah" };
 		String[] strArray2 = new String[]{ "rbx", "ebx", "bx", "bl", "bh" };
 		String[] strArray3 = new String[]{ "rcx", "ecx", "cx", "cl", "ch" };
@@ -349,6 +368,8 @@ public class Program {
 			strArray17 = strArray16;
 		else
 			strArray17[0] = "";                
+		
+		// If there is a register to protect
 		if (!strArray17[0].equals(""))
 		{
 			for (int i = 1; i < strArray20.length; i++) 
@@ -389,6 +410,7 @@ public class Program {
 		return true;
 	}
 
+	// Calculates the SP offset like in the paper
 	private static int calculate_sp_offset(String gadget) throws Exception {
 		String[] strArray = gadget.split(";");
 		int num1 = 0;
@@ -501,6 +523,7 @@ public class Program {
 			strArray30[2] = "XXXX";
 			strArray30[3] = "XXXX";
 		}                
+		// Iterate through instructions in gadget (strArr29)		
 		for (int i = 1; i < strArray29.length; i++)
 		{
 			String ins = strArray29[i];
