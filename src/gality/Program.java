@@ -285,7 +285,6 @@ public class Program {
 		++Program.total_kept;
 	}
 
-	// TODO FIX BUG IN HERE THAT I'M GETTING WHEN RUNNING WITH 0x80
 	private static int get_ret_offset(String ins) throws Exception {
 		if (ins.trim().equals("ret") || ins.trim().equals("retf")) {
 			return 0;
@@ -303,7 +302,11 @@ public class Program {
 		int result = 0;
 		if (str.contains("0x") && !str.contains("+") && !str.contains("-")) {
 			result = Integer.parseInt(str.substring(3).trim(), 16);
-		} else {
+		} else if (str.contains("-0x")){
+			result = Integer.parseInt(str.substring(4).trim(), 16);
+			result *= -1;
+		}
+		else {
 			result = Integer.parseInt(str.trim());
 		} 
 		return result;
