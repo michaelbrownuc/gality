@@ -42,6 +42,8 @@ public class Program {
 	private static boolean STRICT = false;
 	private static int cnt_useful = 0;
 	private static int cnt_gadgets = 0;
+	private static int cnt_JOP_gadgets = 0;
+	private static int cnt_COP_gadgets = 0;
 	private static int cnt_gd_mov_data = 0;
 	private static int cnt_gd_ar = 0;
 	private static int cnt_log = 0;
@@ -55,7 +57,8 @@ public class Program {
 	private static int cnt_fp = 0;
 	private static BufferedWriter output = null;
 	private static double total_score = 0.0;
-	private static int total_kept = 0;
+	private static double total_JOP_score = 0.0;
+	private static double total_COP_score = 0.0;
 	private static int tmp_unmapped = 0;
 	private static final int MAX_RET = 16;
 
@@ -245,31 +248,68 @@ public class Program {
 			{	// Split into array of instructions
 				String str3 = str4.substring(str4.indexOf(" : ") + 3, str4.length());
 				String[] strArray13 = str3.split(";");
-				// Determine if we are going to score this gadget: It starts with a useful instruction, preserves the register of interest in the gadget, and ends in a ret (ROP only).
-				if (Arrays.stream(strArray1).filter(instr -> strArray13[0].startsWith(instr)).count() > 0 && Program.preserves_reg(str3) && strArray13[strArray13.length - 1].contains("ret"))
-				{	// If the gadget contains a return offset, check that it is byte aligned and less than 16 bytes. If so, or if no offset, score the gadget.
-					if (strArray13[strArray13.length - 1].contains("0x"))
+				// Determine if we are going to score this gadget: It starts with a useful instruction and preserves the register of interest in the gadget,
+				if (Arrays.stream(strArray1).filter(instr -> strArray13[0].startsWith(instr)).count() > 0 && Program.preserves_reg(str3))
+				{
+					if(	 strArray13[strArray13.length - 1].contains("ret"))  //  Gadget is a ROP gadget (RET only).
 					{
-						int retOffset = Program.get_ret_offset(strArray13[strArray13.length - 1]);
-						if (retOffset % 4 == 0 && retOffset <= 16){
+						//TODO REMOVEME
+						//System.out.println("Useful Gadget is not ROP specific.");
+
+						// If the gadget contains a return offset, check that it is byte aligned and less than 16 bytes. If so, or if no offset, score the gadget.
+						if (strArray13[strArray13.length - 1].contains("0x"))
+						{
+							int retOffset = Program.get_ret_offset(strArray13[strArray13.length - 1]);
+							if (retOffset % 4 == 0 && retOffset <= 16){
+								Program.found_gadget(str3);
+							}
+
+						}
+						else{
 							Program.found_gadget(str3);
 						}
-
 					}
-					else{
-						Program.found_gadget(str3);
+					else if(strArray13[strArray13.length - 1].contains("jmp")){ // Gadget is a useful JOP gadget (JMP ending)
+						boolean containsOffset = strArray13[strArray13.length - 1].contains("0x");
+
+						// Eliminate direct jump gadgets (ROPGadget includes them for some reason)
+						if( !containsOffset || (containsOffset && strArray13[strArray13.length - 1].contains("[")))
+						{
+							if(Program.preserves_target(str3)) {
+								Program.found_JOP_gadget(str3);
+							}
+						}
+					}
+					else if(strArray13[strArray13.length - 1].contains("call")){ // Gadget is a useful JOP/COP gadget (CALL ending)
+						boolean containsOffset = strArray13[strArray13.length - 1].contains("0x");
+
+						// Eliminate direct jump gadgets (ROPGadget includes them for some reason)
+						if( !containsOffset || (containsOffset && strArray13[strArray13.length - 1].contains("[")))
+						{
+							if(Program.preserves_target(str3)) {
+								Program.found_JOP_COP_gadget(str3);
+							}
+						}
+					}
+					else{ // Gadget is not one of these three (system call gadgets)
+						//TODO what to do here? count towards all?
+						//TODO REMOVEME
+						//System.out.println("Useful Gadget is not ROP/JOP/COP specific: " + str3);
 					}
 				}
-				// TODO: Here is where we can add JOP/COP scoring, an else if that grabs JOP/COP gadgets we consider useful.
-
 			}
-
 		}
 		// Print put gadget quality metric data
 		streamReader3.close();
 		System.out.println("Done.");
-		Program.output.write("Kept " + (Object)Program.cnt_gadgets + " gadgets.\n");
-		Program.output.write("Average gadget score: " + (Object)(Program.total_score / (double)Program.total_kept) +"\n");
+		Program.output.write("Kept " + (Object)Program.cnt_gadgets + " ROP gadgets.\n");
+		Program.output.write("Average ROP gadget score: " + (Object)(Program.total_score / (double)Program.cnt_gadgets) +"\n");
+
+		Program.output.write("Kept " + (Object)Program.cnt_JOP_gadgets + " JOP gadgets.\n");
+		Program.output.write("Average JOP gadget score: " + (Object)(Program.total_JOP_score / (double)Program.cnt_JOP_gadgets) +"\n");
+
+		Program.output.write("Kept " + (Object)Program.cnt_COP_gadgets + " COP gadgets.\n");
+		Program.output.write("Average COP gadget score: " + (Object)(Program.total_COP_score / (double)Program.cnt_COP_gadgets) +"\n");
 		Program.output.close();
 	}
 
@@ -280,7 +320,22 @@ public class Program {
 		int spOffset = Program.calculate_sp_offset(line);
 		double num = Program.calc_score(line) + (double)spOffset;
 		Program.total_score += num;
-		++Program.total_kept;
+	}
+
+	private static void found_JOP_gadget(String line) throws Exception {
+		++Program.cnt_JOP_gadgets;
+
+		double num = Program.calc_score(line);
+		Program.total_JOP_score += num;
+	}
+
+	private static void found_JOP_COP_gadget(String line) throws Exception {
+		++Program.cnt_JOP_gadgets;
+		++Program.cnt_COP_gadgets;
+
+		double num = Program.calc_score(line);
+		Program.total_JOP_score += num;
+		Program.total_COP_score += num;
 	}
 
 	private static int get_ret_offset(String ins) throws Exception {
@@ -400,15 +455,106 @@ public class Program {
 										&& Arrays.stream(strArray17).filter(instr -> str2.contains(instr)).count() > 0 
 										&& !str2.contains("[")))
 							return false;
-
 					}
-
 				}
-
 			}
 		}
 
 		return true;
+	}
+
+	// Identifies the target register of a indirect jump or call ending gadget, ensures that the gadget does not destroy
+	// the target with a static value (dynamic values from stack / other registers OK)
+	private static boolean preserves_target(String gadget) throws Exception {
+		// Determine the register to protect, its the target of the final instruction
+		String[] strArray1 = new String[]{ "rax", "eax", "ax", "al", "ah" };
+		String[] strArray2 = new String[]{ "rbx", "ebx", "bx", "bl", "bh" };
+		String[] strArray3 = new String[]{ "rcx", "ecx", "cx", "cl", "ch" };
+		String[] strArray4 = new String[]{ "rdx", "edx", "dx", "dl", "dh" };
+		String[] strArray5 = new String[]{ "rsi", "esi", "si", "sil" };
+		String[] strArray6 = new String[]{ "rdi", "edi", "di", "dil" };
+		String[] strArray7 = new String[]{ "rbp", "ebp", "bp", "bpl" };
+		String[] strArray8 = new String[]{ "rsp", "esp", "sp", "spl" };
+		String[] strArray9 = new String[]{ "r8", "r8d", "r8w", "r8b" };
+		String[] strArray10 = new String[]{ "r9", "r9d", "r9w", "r9b" };
+		String[] strArray11 = new String[]{ "r10", "r10d", "r10w", "r10b" };
+		String[] strArray12 = new String[]{ "r11", "r11d", "r11w", "r11b" };
+		String[] strArray13 = new String[]{ "r12", "r12d", "r12w", "r12b" };
+		String[] strArray14 = new String[]{ "r13", "r13d", "r13w", "r13b" };
+		String[] strArray15 = new String[]{ "r14", "r14d", "r14w", "r14b" };
+		String[] strArray16 = new String[]{ "r15", "r15d", "r15w", "r15b" };
+		String[] strArray17 = new String[4];
+		String[] strArray18 = new String[]{ "fs", "gs", "cs", "ss", "ds", "es" };
+		String[] strArray20 = gadget.split(";");
+		String regToProtect = Program.get_target_to_protect(strArray20[strArray20.length - 1]);
+		if (Arrays.stream(strArray3).filter(instr -> regToProtect.startsWith(instr)).count() > 0)
+			strArray17 = strArray3;
+		else if (Arrays.stream(strArray4).filter(instr -> regToProtect.startsWith(instr)).count() > 0)
+			strArray17 = strArray4;
+		else if (Arrays.stream(strArray9).filter(instr -> regToProtect.startsWith(instr)).count() > 0)
+			strArray17 = strArray9;
+		else if (Arrays.stream(strArray10).filter(instr -> regToProtect.startsWith(instr)).count() > 0)
+			strArray17 = strArray10;
+		else if (Arrays.stream(strArray1).filter(instr -> regToProtect.startsWith(instr)).count() > 0)
+			strArray17 = strArray1;
+		else if (Arrays.stream(strArray2).filter(instr -> regToProtect.startsWith(instr)).count() > 0)
+			strArray17 = strArray2;
+		else if (Arrays.stream(strArray5).filter(instr -> regToProtect.startsWith(instr)).count() > 0)
+			strArray17 = strArray5;
+		else if (Arrays.stream(strArray6).filter(instr -> regToProtect.startsWith(instr)).count() > 0)
+			strArray17 = strArray6;
+		else if (Arrays.stream(strArray7).filter(instr -> regToProtect.startsWith(instr)).count() > 0)
+			strArray17 = strArray7;
+		else if (Arrays.stream(strArray8).filter(instr -> regToProtect.startsWith(instr)).count() > 0)
+			strArray17 = strArray8;
+		else if (Arrays.stream(strArray11).filter(instr -> regToProtect.startsWith(instr)).count() > 0)
+			strArray17 = strArray11;
+		else if (Arrays.stream(strArray12).filter(instr -> regToProtect.startsWith(instr)).count() > 0)
+			strArray17 = strArray12;
+		else if (Arrays.stream(strArray13).filter(instr -> regToProtect.startsWith(instr)).count() > 0)
+			strArray17 = strArray13;
+		else if (Arrays.stream(strArray14).filter(instr -> regToProtect.startsWith(instr)).count() > 0)
+			strArray17 = strArray14;
+		else if (Arrays.stream(strArray15).filter(instr -> regToProtect.startsWith(instr)).count() > 0)
+			strArray17 = strArray15;
+		else if (Arrays.stream(strArray16).filter(instr -> regToProtect.startsWith(instr)).count() > 0)
+			strArray17 = strArray16;
+		else
+			throw new Exception("No target register identified!");
+
+		// Check instructions for alterations to static alterations to the jump register
+		for (int i = 1; i < strArray20.length-1; i++)
+		{
+			String str1 = strArray20[i].trim();
+
+			String opcode="", dest="", orig="";
+
+			if(str1.contains(" ") && str1.contains(",")){
+				opcode = str1.substring(0, str1.indexOf(" "));
+				dest = str1.substring(opcode.length(), str1.indexOf(","));
+				orig = str1.substring(str1.indexOf(",")+2, str1.length());
+			}
+
+			final String destination = dest;
+			final String origin = orig;
+
+			// Does this instruction move a value into the register to Protect?
+			if( opcode.equals("mov") && Arrays.stream(strArray17).filter(instr -> destination.contains(instr)).count() > 0){
+				// Check that the destination is not a segment register or a constant
+				if(Arrays.stream(strArray18).filter(instr -> origin.contains(instr)).count() > 0 ||
+					(origin.contains("0x") && !origin.contains("[")) || isIntegerConstant(origin)){
+					return false;
+				}
+			}
+		}
+		return true;
+	}
+
+	static boolean isIntegerConstant(String str){
+		try {
+			int x  = Integer.parseInt(str);
+			return true;
+		} catch(NumberFormatException exc) { return false;}
 	}
 
 	// Calculates the SP offset like in the paper
@@ -624,6 +770,28 @@ public class Program {
 
 		return str;
 	}
+	// Returns the register to be protected from the indirect branch or call target
+	private static String get_target_to_protect(String ins) throws Exception {
+		String str = "";
+
+		// If the instrction contains a dereference, then the target is the next three characters.
+		if(ins.contains("[")){
+			int bracketIndex = ins.indexOf("[");
+			str =  ins.substring(bracketIndex+1, bracketIndex+4);
+		}
+		// Otherwise it is the last three characters.
+		else{
+			str = ins.substring(ins.length()-3, ins.length());
+		}
+
+		// Trim the string of whitespace and / or a trailing closing bracket to account for two character registers
+		str = str.trim();
+		if (str.contains("]"))
+			str = str.substring(0, str.indexOf("]"));
+
+		return str;
+	}
+
 
 	private static String[] process_ins(String ins) throws Exception {
 		ins = ins.trim();
