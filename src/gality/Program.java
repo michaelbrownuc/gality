@@ -253,9 +253,6 @@ public class Program {
 				{
 					if(	 strArray13[strArray13.length - 1].contains("ret"))  //  Gadget is a ROP gadget (RET only).
 					{
-						//TODO REMOVEME
-						//System.out.println("Useful Gadget is not ROP specific.");
-
 						// If the gadget contains a return offset, check that it is byte aligned and less than 16 bytes. If so, or if no offset, score the gadget.
 						if (strArray13[strArray13.length - 1].contains("0x"))
 						{
@@ -292,9 +289,16 @@ public class Program {
 						}
 					}
 					else{ // Gadget is not one of these three (system call gadgets)
-						//TODO what to do here? count towards all?
-						//TODO REMOVEME
-						//System.out.println("Useful Gadget is not ROP/JOP/COP specific: " + str3);
+						// Currently, we discard these as system call gadgets really aren't "functional", and we just
+						// want this output to capture the quality of the functional gadgets.
+						// We could calculate quality of system call gadgets as a function of clobbered registers before
+						// the system call, but this is usually a waste as most system call gadgets are just longer
+						// versions of the specific gadgets that cause the interrupt. This occurs becasue these gadgets
+						// are required to start with a "useful" (array1) instruction.  While it is possible that an
+						// attacker could use a gadget that performs some task and then invokes the system call, it is
+						// likely easer to just use two gadgets, one that performs the task and one that invokes the
+						// system call as its sole function.
+						System.out.println("Gadget is not ROP/JOP/COP specific, skipping it: " + str3);
 					}
 				}
 			}
@@ -595,7 +599,7 @@ public class Program {
 		}
 		return num1 < 0 ? 2 : 0;
 	}
-
+	// TODO START HERE: Does this also work for JOP/COP scores?  If Not, fix it.
 	private static double calc_score(String gadget) throws Exception {
 		String[] strArray1 = new String[]{ "pop", "push", "mov ", "xchg", "lea", "cmov", "movabs", "movzx", "movsx" };
 		String[] strArray2 = new String[]{ "add ", "sub ", "inc ", "dec ", "xor ", "neg", "not", "sbb ", "adc ", "mul ", "div ", "imul", "idiv" };
