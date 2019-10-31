@@ -329,7 +329,7 @@ public class Program {
 	private static void found_JOP_gadget(String line) throws Exception {
 		++Program.cnt_JOP_gadgets;
 
-		double num = Program.calc_score(line);
+		double num = Program.calc_JOP_COP_score(line);
 		Program.total_JOP_score += num;
 	}
 
@@ -337,7 +337,7 @@ public class Program {
 		++Program.cnt_JOP_gadgets;
 		++Program.cnt_COP_gadgets;
 
-		double num = Program.calc_score(line);
+		double num = Program.calc_JOP_COP_score(line);
 		Program.total_JOP_score += num;
 		Program.total_COP_score += num;
 	}
@@ -599,7 +599,7 @@ public class Program {
 		}
 		return num1 < 0 ? 2 : 0;
 	}
-	// TODO START HERE: Does this also work for JOP/COP scores?  If Not, fix it.
+
 	private static double calc_score(String gadget) throws Exception {
 		String[] strArray1 = new String[]{ "pop", "push", "mov ", "xchg", "lea", "cmov", "movabs", "movzx", "movsx" };
 		String[] strArray2 = new String[]{ "add ", "sub ", "inc ", "dec ", "xor ", "neg", "not", "sbb ", "adc ", "mul ", "div ", "imul", "idiv" };
@@ -753,6 +753,217 @@ public class Program {
 				++Program.tmp_unmapped;
 			}
 			// MDB - Check to see if the gadget contains an unconditional branch.  If it occurs, increase score by 2.0.			
+			else if (Arrays.stream(condBranchInstrs).filter(instr -> ins.contains(instr)).count() > 0){
+				num += 2.0;
+			}
+		}
+		return num;
+	}
+
+	// Variant of calc score for calculating JOP and COP scores. Since these gadgets do not use the stack for control-flow,
+	// we need to change the scoring methedology.  Rather than look for instructions that modify RSP/ESP, it should look
+	// for instructions that modify the target register of the jump/call, as this must point to the dispatcher or
+	// next gadget or some other special purpose control-flow gadget.
+	private static double calc_JOP_COP_score(String gadget) throws Exception {
+		// Establish constants for string searches
+		String[] strArray1 = new String[]{ "pop", "push", "mov ", "xchg", "lea", "cmov", "movabs", "movzx", "movsx" };
+		String[] strArray2 = new String[]{ "add ", "sub ", "inc ", "dec ", "xor ", "neg", "not", "sbb ", "adc ", "mul ", "div ", "imul", "idiv" };
+		String[] strArray3 = new String[]{ "cmp", "and ", "or ", "test" };
+		String[] strArray4 = new String[]{ "call", "sysenter", "enter ", "int ", "int1", "jmp", "je", "jne", "jo", "jp", "js", "lcall", "ljmp", "jg", "jge", "ja", "jae", "jb", "jbe", "jl", "jle", "jno", "jnp", "jns", "loop", "jrcxz" };
+		String[] strArray5 = new String[]{ "shl", "shr", "sar", "sal", "ror", "rol", "rcr", "rcl" };
+		String[] strArray6 = new String[]{ "xlatb", "sti", "std", "stc", "lahf", "hlt", "cwde", "cmc", "cli", "cld", "clc", "cdq" };
+		String[] strArray7 = new String[]{ "wait", "set", "out", "in ", "leave", "insb", "insd", "insw", "ins " };
+		String[] strArray8 = new String[]{ "stosd", "stosb", "scas", "salc", "sahf", "lods", "movs" };
+		String[] strArray9 = new String[]{ "ret" };
+		String[] strArray10 = new String[]{ "nop" };
+		String[] strArray11 = new String[]{ "divps", "mulps", "movups", "movaps", "addps", "rcpss", "sqrtss", "maxps", "minps", "andps", "orps", "xorps", "cmpps", "vsubpd", "vpsubsb", "vmulss", "vminsd", "ucomiss", "subss", "subps", "subsd", "divss", "addss", "addsd", "cvtpi2ps", "cvtps2pd", "cvtsd2ss", "cvtsi2sd", "cvtsi2ss", "cvtss2sd", "mulsd", "mulss", "fmul", "fdiv", "fcomp", "fadd" };
+		String[] strArray12 = new String[]{ "pxor", "movd", "movq" };
+		String[] axRegArray = new String[]{ "rax", "eax", "ax", "al", "ah" };
+		String[] bxRegArray = new String[]{ "rbx", "ebx", "bx", "bl", "bh" };
+		String[] cxRegArray = new String[]{ "rcx", "ecx", "cx", "cl", "ch" };
+		String[] dxRegArray = new String[]{ "rdx", "edx", "dx", "dl", "dh" };
+		String[] siRegArray = new String[]{ "rsi", "esi", "si", "sil" };
+		String[] diRegArray = new String[]{ "rdi", "edi", "di", "dil" };
+		String[] bpRegArray = new String[]{ "rbp", "ebp", "bp", "bpl" };
+		String[] spRegArray = new String[]{ "rsp", "esp", "sp", "spl" };
+		String[] r8RegArray = new String[]{ "r8", "r8d", "r8w", "r8b" };
+		String[] r9RegArray = new String[]{ "r9", "r9d", "r9w", "r9b" };
+		String[] r10RegArray = new String[]{ "r10", "r10d", "r10w", "r10b" };
+		String[] r11RegArray = new String[]{ "r11", "r11d", "r11w", "r11b" };
+		String[] r12RegARray = new String[]{ "r12", "r12d", "r12w", "r12b" };
+		String[] r13RegArray = new String[]{ "r13", "r13d", "r13w", "r13b" };
+		String[] r14RegArray = new String[]{ "r14", "r14d", "r14w", "r14b" };
+		String[] r15RegArray = new String[]{ "r15", "r15d", "r15w", "r15b" };
+		String[] condBranchInstrs = new String[]{ "jo", "jno", "js", "jns", "je,", "jz", "jne", "jnz", "jb", "jnae", "jc", "jnb", "jae", "jnc", "jbe", "jna", "ja", "jnbe", "jl", "jnge", "jnl", "jge", "jle", "jng", "jg", "jnle", "jp", "jpe", "jnp", "jpo", "jcxz", "jecxz" };
+
+		String[] gadgetsArray = gadget.split(";");
+		double num = 0.0;
+
+		// Get the registers to watch for, the operational register and the branch target register
+		String[] protectedRegArray = new String[4];
+		String[] protectedTargetArray = new String[4];
+		String regToProtect = Program.get_reg_to_protect(gadgetsArray[0]);
+		String targetToProtect = Program.get_target_to_protect(gadgetsArray[gadgetsArray.length-1]);
+
+		// Determine the register set of the protected operational register. It is possible there is no protected reg.
+		if (Arrays.stream(cxRegArray).filter(instr -> regToProtect.startsWith(instr)).count() > 0)
+			protectedRegArray = cxRegArray;
+		else if (Arrays.stream(dxRegArray).filter(instr -> regToProtect.startsWith(instr)).count() > 0)
+			protectedRegArray = dxRegArray;
+		else if (Arrays.stream(r8RegArray).filter(instr -> regToProtect.startsWith(instr)).count() > 0)
+			protectedRegArray = r8RegArray;
+		else if (Arrays.stream(r9RegArray).filter(instr -> regToProtect.startsWith(instr)).count() > 0)
+			protectedRegArray = r9RegArray;
+		else if (Arrays.stream(axRegArray).filter(instr -> regToProtect.startsWith(instr)).count() > 0)
+			protectedRegArray = axRegArray;
+		else if (Arrays.stream(bxRegArray).filter(instr -> regToProtect.startsWith(instr)).count() > 0)
+			protectedRegArray = bxRegArray;
+		else if (Arrays.stream(siRegArray).filter(instr -> regToProtect.startsWith(instr)).count() > 0)
+			protectedRegArray = siRegArray;
+		else if (Arrays.stream(diRegArray).filter(instr -> regToProtect.startsWith(instr)).count() > 0)
+			protectedRegArray = diRegArray;
+		else if (Arrays.stream(bpRegArray).filter(instr -> regToProtect.startsWith(instr)).count() > 0)
+			protectedRegArray = bpRegArray;
+		else if (Arrays.stream(spRegArray).filter(instr -> regToProtect.startsWith(instr)).count() > 0)
+			protectedRegArray = spRegArray;
+		else if (Arrays.stream(r10RegArray).filter(instr -> regToProtect.startsWith(instr)).count() > 0)
+			protectedRegArray = r10RegArray;
+		else if (Arrays.stream(r11RegArray).filter(instr -> regToProtect.startsWith(instr)).count() > 0)
+			protectedRegArray = r11RegArray;
+		else if (Arrays.stream(r12RegARray).filter(instr -> regToProtect.startsWith(instr)).count() > 0)
+			protectedRegArray = r12RegARray;
+		else if (Arrays.stream(r13RegArray).filter(instr -> regToProtect.startsWith(instr)).count() > 0)
+			protectedRegArray = r13RegArray;
+		else if (Arrays.stream(r14RegArray).filter(instr -> regToProtect.startsWith(instr)).count() > 0)
+			protectedRegArray = r14RegArray;
+		else if (Arrays.stream(r15RegArray).filter(instr -> regToProtect.startsWith(instr)).count() > 0)
+		{
+			protectedRegArray = r15RegArray;
+		}
+		else
+		{
+			protectedRegArray[0] = "XXXX";
+			protectedRegArray[1] = "XXXX";
+			protectedRegArray[2] = "XXXX";
+			protectedRegArray[3] = "XXXX";
+		}
+
+		// Get the register set of the protected branch target register.  If one is not found, this is an error condition.
+		if (Arrays.stream(cxRegArray).filter(instr -> targetToProtect.startsWith(instr)).count() > 0)
+			protectedTargetArray = cxRegArray;
+		else if (Arrays.stream(dxRegArray).filter(instr -> targetToProtect.startsWith(instr)).count() > 0)
+			protectedTargetArray = dxRegArray;
+		else if (Arrays.stream(r8RegArray).filter(instr -> targetToProtect.startsWith(instr)).count() > 0)
+			protectedTargetArray = r8RegArray;
+		else if (Arrays.stream(r9RegArray).filter(instr -> targetToProtect.startsWith(instr)).count() > 0)
+			protectedTargetArray = r9RegArray;
+		else if (Arrays.stream(axRegArray).filter(instr -> targetToProtect.startsWith(instr)).count() > 0)
+			protectedTargetArray = axRegArray;
+		else if (Arrays.stream(bxRegArray).filter(instr -> targetToProtect.startsWith(instr)).count() > 0)
+			protectedTargetArray = bxRegArray;
+		else if (Arrays.stream(siRegArray).filter(instr -> targetToProtect.startsWith(instr)).count() > 0)
+			protectedTargetArray = siRegArray;
+		else if (Arrays.stream(diRegArray).filter(instr -> targetToProtect.startsWith(instr)).count() > 0)
+			protectedTargetArray = diRegArray;
+		else if (Arrays.stream(bpRegArray).filter(instr -> targetToProtect.startsWith(instr)).count() > 0)
+			protectedTargetArray = bpRegArray;
+		else if (Arrays.stream(spRegArray).filter(instr -> targetToProtect.startsWith(instr)).count() > 0)
+			protectedTargetArray = spRegArray;
+		else if (Arrays.stream(r10RegArray).filter(instr -> targetToProtect.startsWith(instr)).count() > 0)
+			protectedTargetArray = r10RegArray;
+		else if (Arrays.stream(r11RegArray).filter(instr -> targetToProtect.startsWith(instr)).count() > 0)
+			protectedTargetArray = r11RegArray;
+		else if (Arrays.stream(r12RegARray).filter(instr -> targetToProtect.startsWith(instr)).count() > 0)
+			protectedTargetArray = r12RegARray;
+		else if (Arrays.stream(r13RegArray).filter(instr -> targetToProtect.startsWith(instr)).count() > 0)
+			protectedTargetArray = r13RegArray;
+		else if (Arrays.stream(r14RegArray).filter(instr -> targetToProtect.startsWith(instr)).count() > 0)
+			protectedTargetArray = r14RegArray;
+		else if (Arrays.stream(r15RegArray).filter(instr -> targetToProtect.startsWith(instr)).count() > 0)
+			protectedTargetArray = r15RegArray;
+		else
+			throw new Exception("No target register class Identified when scoring JOP/COP gadget!");
+
+		// Iterate through instructions in gadget
+		for (int i = 1; i < gadgetsArray.length; i++)
+		{
+			String ins = gadgetsArray[i];
+
+			// Check for clobbering of the operational register or the branch target
+			// First check if the current instruction is: "pop", "mov ", "xchg", "lea", "cmov", "movabs", "movzx", "movsx"
+			if (Arrays.stream(strArray1).filter(instr -> ins.contains(instr)).count() > 0)
+			{
+				if (!ins.contains("push"))
+				{
+					String[] processedInstr = Program.process_ins(ins);
+					// If the instruction takes only a destination (in this case, POP)
+					if (processedInstr.length == 2)
+					{
+						// If the instruction clobbers the protected target, +2.0
+						if (Arrays.stream(protectedTargetArray).filter(instr -> processedInstr[1].contains(instr)).count() > 0)
+							num += 2.0;
+						// Otherwise, if the isntruciton clobbers the protected register,  +1.0
+						else if (Arrays.stream(protectedRegArray).filter(instr -> processedInstr[1].contains(instr)).count() > 0)
+							++num;
+						// Otherwise if the instruction clobbers a bystander register, +0.5
+						else
+							num += 0.5;
+					}
+					// Otherwise, the instruction takes two parameters
+					else if (processedInstr.length == 3)
+					{
+						// If the instruction exchanges values and the second paramter is the protected target, +2.0
+						if (processedInstr[0].equals("xchg") && Arrays.stream(protectedTargetArray).filter(instr -> processedInstr[2].contains(instr)).count() > 0)
+							num += 2.0;
+						else if (Arrays.stream(protectedTargetArray).filter(instr -> processedInstr[1].contains(instr)).count() > 0)
+							num += 2.0;
+						else if (Arrays.stream(protectedRegArray).filter(instr -> processedInstr[1].contains(instr)).count() > 0)
+							++num;
+						else
+							num += 0.5;
+					}
+				}
+			}
+			// Next Check for arithmetic operations on the operational register or branch target
+			else if (Arrays.stream(strArray2).filter(instr -> ins.contains(instr)).count() > 0)
+			{
+				String[] processedInstr = Program.process_ins(ins);
+				if (processedInstr.length >= 2) {
+					if (Arrays.stream(protectedTargetArray).filter(instr -> processedInstr[1].contains(instr)).count() > 0)
+						num += 2.0;
+					else if (Arrays.stream(protectedRegArray).filter(instr -> processedInstr[1].contains(instr)).count() > 0)
+						++num;
+					else
+						num += 0.5;
+				}
+				// MDB - Simplified this code from original, the check for length is not correct / necessary
+			}
+			// Next Check if the instruction is a shift or rotate instruction
+			else if (Arrays.stream(strArray5).filter(instr -> ins.contains(instr)).count() > 0)
+			{
+				String[] processedInstr = Program.process_ins(ins);
+				if (processedInstr.length == 3)
+				{
+					if (Arrays.stream(protectedTargetArray).filter(instr -> processedInstr[1].contains(instr)).count() > 0)
+						num += 3.0;
+					else if (Arrays.stream(protectedRegArray).filter(instr -> processedInstr[1].contains(instr)).count() > 0)
+						num += 1.5;
+					else
+						num += 0.5;
+				}
+			}
+			else if (!(Arrays.stream(strArray3).filter(instr -> ins.contains(instr)).count() > 0)
+					&& !(Arrays.stream(strArray4).filter(instr -> ins.contains(instr)).count() > 0)
+					&& (!(Arrays.stream(strArray6).filter(instr -> ins.contains(instr)).count() > 0)
+					&& !(Arrays.stream(strArray7).filter(instr -> ins.contains(instr)).count() > 0))
+					&& (!(Arrays.stream(strArray8).filter(instr -> ins.contains(instr)).count() > 0)
+					&& !(Arrays.stream(strArray9).filter(instr -> ins.contains(instr)).count() > 0)
+					&& (!(Arrays.stream(strArray10).filter(instr -> ins.contains(instr)).count() > 0)
+					&& !(Arrays.stream(strArray11).filter(instr -> ins.contains(instr)).count() > 0)))
+					&& !(Arrays.stream(strArray12).filter(instr -> ins.contains(instr)).count() > 0)){
+				++Program.tmp_unmapped;
+			}
+			// MDB - Check to see if the gadget contains an unconditional branch.  If it occurs, increase score by 2.0.
 			else if (Arrays.stream(condBranchInstrs).filter(instr -> ins.contains(instr)).count() > 0){
 				num += 2.0;
 			}
