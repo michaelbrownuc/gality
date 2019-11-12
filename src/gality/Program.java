@@ -318,10 +318,17 @@ public class Program {
 	}
 
 	private static void found_gadget(String line) throws Exception {
+		// It is posible that a gadget will attempt to increase the stack pointer by a register value.
+		// We check for this by returning -999 from the calculate function.
+		int spOffset = Program.calculate_sp_offset(line);
+
+		if(spOffset == -999) {
+			return;
+		}
+
 		// MDB Redundant check eliminated (preserves_reg())
 		++Program.cnt_gadgets;
 
-		int spOffset = Program.calculate_sp_offset(line);
 		double num = Program.calc_score(line) + (double)spOffset;
 		Program.total_score += num;
 	}
@@ -582,16 +589,18 @@ public class Program {
 
 			if (ins.contains("leave") && num2 != 0)
 				return 2;
+			try {
+				if (ins.contains("ret"))
+					num1 += Program.get_ret_offset(ins);
 
-			if (ins.contains("ret"))
-				num1 += Program.get_ret_offset(ins);
+				if (ins.contains("add esp") || ins.contains("add rsp"))
+					num1 += Program.get_offset(ins);
 
-			if (ins.contains("add esp") || ins.contains("add rsp"))
-				num1 += Program.get_offset(ins);
-
-			if (ins.contains("sub esp") || ins.contains("sub rsp"))
-				num1 += Program.get_offset(ins);
-
+				if (ins.contains("sub esp") || ins.contains("sub rsp"))
+					num1 += Program.get_offset(ins);
+			} catch(NumberFormatException ex){
+				return -999;
+			}
 			if ((ins.contains("mov rsp") || ins.contains("mov esp")) && num2 != 0 || ins.contains("xchg") && (ins.contains("rsp") || ins.contains("esp")) && num2 != 0)
 				return 4;
 
