@@ -272,7 +272,8 @@ public class Program {
 						// Eliminate direct jump gadgets (ROPGadget includes them for some reason)
 						if( !containsOffset || (containsOffset && strArray13[strArray13.length - 1].contains("[")))
 						{
-							if(Program.preserves_target(str3)) {
+							// Need to filter gadgets that use RIP relative addressing in addition to checking for target preservation.
+							if(!strArray13[strArray13.length-1].contains("rip") && Program.preserves_target(str3)) {
 								Program.found_JOP_gadget(str3);
 							}
 						}
@@ -283,7 +284,8 @@ public class Program {
 						// Eliminate direct jump gadgets (ROPGadget includes them for some reason)
 						if( !containsOffset || (containsOffset && strArray13[strArray13.length - 1].contains("[")))
 						{
-							if(Program.preserves_target(str3)) {
+							// Need to filter gadgets that use RIP relative addressing in addition to checking for target preservation. 
+							if(!strArray13[strArray13.length-1].contains("rip") && Program.preserves_target(str3)) {
 								Program.found_JOP_COP_gadget(str3);
 							}
 						}
@@ -531,7 +533,7 @@ public class Program {
 		else if (Arrays.stream(strArray16).filter(instr -> regToProtect.startsWith(instr)).count() > 0)
 			strArray17 = strArray16;
 		else
-			throw new Exception("No target register identified!");
+			throw new Exception("No target register identified in gadget " + gadget + " !");
 
 		// Check instructions for alterations to static alterations to the jump register
 		for (int i = 1; i < strArray20.length-1; i++)
