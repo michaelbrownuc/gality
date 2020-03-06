@@ -352,7 +352,7 @@ public class Program {
 	}
 
 	private static int get_ret_offset(String ins) throws Exception {
-		if (ins.trim().equals("ret") || ins.trim().equals("retf")) {
+		if (ins.trim().equals("ret") || ins.trim().equals("retf") || ins.trim().equals("iretd")) {
 			return 0;
 		}
 
