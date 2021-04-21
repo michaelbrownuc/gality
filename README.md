@@ -1,3 +1,8 @@
+# Obsolescence
+
+This version of GaLity has been re-implemented within GSA (https://github.com/michaelbrownuc/GadgetSetAnalyzer) and is no longer supported. The functionality in this project will be supported as part of GSA from now on. This repository has been left up for informational purposes only.
+
+
 # What is Gality?
 
 GaLity is an open-source implementation to compute metrics on sets of gadgets which has been developed by Andreas Follner. This particular version has been updated and expanded by Michael D. Brown. This version of gality will calculate the originally proposed metrics for JOP and COP gadgets, and also incorporates some minor bug fixes and code comments.
